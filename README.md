@@ -1,21 +1,53 @@
-MIT License
+# laiue radio
 
-Copyright (c) 2026 landiunload
+Нативный проигрыватель музыки из видеоигр для Windows. Браузерный интерфейс и
+Node-сервер удалены: окно, ввод, звук, сеть и отрисовка работают в одном C17
+приложении.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## Что внутри
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+- D3D12-интерфейс с собственным immediate-mode UI-pass;
+- Media Foundation для воспроизведения локальных файлов;
+- случайные треки Khinsider через фоновый WinHTTP-источник;
+- локальный кэш аудио и обложек в `%LOCALAPPDATA%\laiue-radio\cache`;
+- очередь с упреждающей загрузкой, история, seek, volume и mute;
+- восстановление громкости и последних 50 треков между запусками;
+- открытие локальных MP3, OGG, M4A, WAV, FLAC, WMA и AAC;
+- WARP fallback, если аппаратный D3D12-адаптер недоступен.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Компоненты окна, ввода, таймера, UI-pass и аудиосистемы адаптированы из
+наработок `laiue`. Игровой runtime, мир, чанки, ресурспаки и прочие ненужные
+плееру подсистемы сюда не переносились. Исходный репозиторий `laiue` не
+является зависимостью и при сборке не изменяется.
+
+## Сборка
+
+Нужны Windows 10/11, Visual Studio 2022 с MSVC и Windows SDK, CMake 3.28+.
+
+```powershell
+cmake --preset visual-studio
+cmake --build --preset release --parallel
+ctest --preset release
+```
+
+Готовый файл:
+`build\visual-studio\bin\Release\laiue_radio.exe`.
+
+Можно сразу передать локальный файл:
+
+```powershell
+.\build\visual-studio\bin\Release\laiue_radio.exe "D:\Music\track.mp3"
+```
+
+## Управление
+
+- `Space` — воспроизведение / пауза;
+- `Left` / `Right` — предыдущий / следующий трек;
+- `M` — выключить звук;
+- `R` — повторить запрос к онлайн-источнику;
+- `F11` — полноэкранный режим;
+- `Esc` — выход.
+
+Онлайн-источник может отклонять запросы отдельных IP. Это не блокирует
+локальный режим: кнопку «Открыть файл» можно использовать без сети.
+

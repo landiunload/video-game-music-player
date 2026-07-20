@@ -1,0 +1,36 @@
+{
+    "version": 8,
+    "configurePresets": [
+        {
+            "name": "visual-studio",
+            "displayName": "Visual Studio",
+            "binaryDir": "${sourceDir}/build/visual-studio"
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "release",
+            "configurePreset": "visual-studio",
+            "configuration": "Release"
+        },
+        {
+            "name": "debug",
+            "configurePreset": "visual-studio",
+            "configuration": "Debug"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "release",
+            "configurePreset": "visual-studio",
+            "configuration": "Release",
+            "output": { "outputOnFailure": true }
+        },
+        {
+            "name": "debug",
+            "configurePreset": "visual-studio",
+            "configuration": "Debug",
+            "output": { "outputOnFailure": true }
+        }
+    ]
+}
