@@ -47,6 +47,7 @@ void UiFontRelease(UiFont* font)
     font->atlasWidth = 0;
     font->atlasHeight = 0;
     font->pixelSize = 0;
+    memset(font->lookup, 0xFF, sizeof(font->lookup));
 }
 
 bool UiFontBake(UiFont* font, int32_t pixelSize)
@@ -233,6 +234,15 @@ bool UiFontBake(UiFont* font, int32_t pixelSize)
     font->atlasHeight = atlasHeight;
     font->glyphs = glyphs;
     font->glyphCount = glyphCount;
+    memset(font->lookup, 0xFF, sizeof(font->lookup));
+    for (uint32_t i = 0; i < glyphCount; ++i)
+    {
+        uint16_t codepoint = glyphs[i].codepoint;
+        if (codepoint >= UI_FONT_LOOKUP_FIRST && codepoint <= UI_FONT_LOOKUP_LAST)
+        {
+            font->lookup[codepoint - UI_FONT_LOOKUP_FIRST] = (uint16_t)i;
+        }
+    }
     font->ascent = (float)textMetrics.tmAscent;
     font->lineHeight = (float)(textMetrics.tmHeight + textMetrics.tmExternalLeading);
     font->pixelSize = pixelSize;
@@ -241,25 +251,16 @@ bool UiFontBake(UiFont* font, int32_t pixelSize)
 
 const UiGlyph* UiFontFindGlyph(const UiFont* font, uint16_t codepoint)
 {
-    uint32_t low = 0;
-    uint32_t high = font->glyphCount;
-    while (low < high)
+    if (codepoint < UI_FONT_LOOKUP_FIRST || codepoint > UI_FONT_LOOKUP_LAST)
     {
-        uint32_t middle = (low + high) / 2;
-        if (font->glyphs[middle].codepoint < codepoint)
-        {
-            low = middle + 1;
-        }
-        else
-        {
-            high = middle;
-        }
+        return NULL;
     }
-    if (low < font->glyphCount && font->glyphs[low].codepoint == codepoint)
+    uint16_t index = font->lookup[codepoint - UI_FONT_LOOKUP_FIRST];
+    if (index >= font->glyphCount)
     {
-        return &font->glyphs[low];
+        return NULL;  // UI_FONT_GLYPH_NONE либо атлас ещё не запечён
     }
-    return NULL;
+    return &font->glyphs[index];
 }
 
 float UiFontMeasure(const UiFont* font, const wchar_t* text)

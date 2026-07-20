@@ -95,4 +95,16 @@ if(BUILD_TESTING)
     target_compile_options(source_tests PRIVATE /W4 /utf-8)
     target_link_libraries(source_tests PRIVATE shlwapi winhttp)
     add_test(NAME online_source_parsers COMMAND source_tests)
+
+    add_executable(ui_font_tests
+        tests/ui_font_tests.c
+        src/engine/ui_font.c
+        src/engine/ui_font.h
+    )
+    target_include_directories(ui_font_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+    target_compile_definitions(ui_font_tests PRIVATE
+        NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+    target_compile_options(ui_font_tests PRIVATE /W4 /utf-8)
+    target_link_libraries(ui_font_tests PRIVATE gdi32 user32)
+    add_test(NAME ui_font_glyph_lookup COMMAND ui_font_tests)
 endif()

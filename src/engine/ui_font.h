@@ -19,6 +19,14 @@ typedef struct UiGlyph
     float u0, v0, u1, v1;
 } UiGlyph;
 
+// Прямая таблица кодовая точка -> индекс глифа. Покрывает весь запекаемый
+// диапазон (0x0020..0x0451), что даёт поиск за O(1) вместо бинарного:
+// текст рисуется посимвольно каждый кадр, и это самый горячий путь UI.
+#define UI_FONT_LOOKUP_FIRST 0x0020u
+#define UI_FONT_LOOKUP_LAST  0x0451u
+#define UI_FONT_LOOKUP_COUNT (UI_FONT_LOOKUP_LAST - UI_FONT_LOOKUP_FIRST + 1u)
+#define UI_FONT_GLYPH_NONE   0xFFFFu
+
 typedef struct UiFont
 {
     uint8_t* atlas;      // альфа 8 бит, atlasWidth * atlasHeight
@@ -29,6 +37,7 @@ typedef struct UiFont
     float ascent;        // от верха строки до базовой линии
     float lineHeight;
     int32_t pixelSize;
+    uint16_t lookup[UI_FONT_LOOKUP_COUNT];  // UI_FONT_GLYPH_NONE — нет глифа
 } UiFont;
 
 // Печёт атлас под размер шрифта в пикселях; повторный вызов перепекает,
