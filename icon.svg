@@ -1,0 +1,17 @@
+{
+  "name": "laiue radio",
+  "short_name": "laiue",
+  "description": "Случайная музыка из видеоигр, история и личные плейлисты.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c0d10",
+  "theme_color": "#0c0d10",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
