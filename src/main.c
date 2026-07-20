@@ -340,7 +340,7 @@ static void DrawSidebar(Application* application, float x, float y,
 
     float buttonY = y + 86 * s;
     if (UiButton(ui, 100, x + 16 * s, buttonY,
-        width - 32 * s, 42 * s, L"Случайное радио"))
+        width - 32 * s, 42 * s, L"OC ReMix радио"))
     {
         application->onlinePaused = false;
         RequestOnlineQueue(application);
@@ -396,9 +396,19 @@ static void DrawCenter(Application* application,
     {
         UiText(ui, x + 22 * s, y + 15 * s, UI_COLOR_TEXT_DIM,
             application->hasCurrent
-                ? (application->current.local ? L"Локальный файл" : L"Случайное радио")
+                ? (application->current.local ? L"Локальный файл" : L"OverClocked ReMix")
                 : L"Музыка не выбрана");
     }
+    if (UiButton(ui, 110, x + width - 142 * s, y + 10 * s,
+        56 * s, 30 * s, L"Радио"))
+    {
+        application->onlinePaused = false;
+        RequestOnlineQueue(application);
+        SetMessage(application, L"Ищем случайный саундтрек...", 3.0);
+    }
+    if (UiButton(ui, 111, x + width - 78 * s, y + 10 * s,
+        56 * s, 30 * s, L"Файл"))
+        OpenLocalTrack(application);
 
     float cover = height * 0.39f;
     float maxCover = width * 0.58f;
@@ -741,10 +751,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previousInstance,
     (void)instance;
     (void)previousInstance;
     (void)showCommand;
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    UINT systemDpi = GetDpiForSystem();
     WindowConfiguration configuration = {
         .title = L"laiue radio — video game music",
-        .width = 1180,
-        .height = 760,
+        .width = MulDiv(1180, (int)systemDpi, 96),
+        .height = MulDiv(760, (int)systemDpi, 96),
     };
     Window* window = WindowCreate(&configuration);
     if (window == NULL) return 1;

@@ -94,6 +94,29 @@ static LRESULT CALLBACK WindowProcedure(HWND handle, UINT message, WPARAM wParam
             }
             return 0;
 
+        case WM_GETMINMAXINFO:
+            if (window != NULL)
+            {
+                UINT dpi = GetDpiForWindow(handle);
+                MINMAXINFO* limits = (MINMAXINFO*)lParam;
+                limits->ptMinTrackSize.x = MulDiv(720, (int)dpi, 96);
+                limits->ptMinTrackSize.y = MulDiv(500, (int)dpi, 96);
+                return 0;
+            }
+            break;
+
+        case WM_DPICHANGED:
+            if (window != NULL && !window->fullscreen)
+            {
+                const RECT* suggested = (const RECT*)lParam;
+                SetWindowPos(handle, NULL, suggested->left, suggested->top,
+                    suggested->right - suggested->left,
+                    suggested->bottom - suggested->top,
+                    SWP_NOACTIVATE | SWP_NOZORDER);
+                return 0;
+            }
+            break;
+
         case WM_MOUSEWHEEL:
             if (window != NULL)
             {
@@ -144,6 +167,7 @@ static LRESULT CALLBACK WindowProcedure(HWND handle, UINT message, WPARAM wParam
         default:
             return DefWindowProcW(handle, message, wParam, lParam);
     }
+    return DefWindowProcW(handle, message, wParam, lParam);
 }
 
 Window* WindowCreate(const WindowConfiguration* configuration)

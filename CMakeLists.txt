@@ -20,8 +20,8 @@ add_executable(laiue_radio WIN32
     src/track.h
     src/player_state.c
     src/player_state.h
-    src/source/khinsider.c
-    src/source/khinsider.h
+    src/source/ocremix.c
+    src/source/ocremix.h
     src/source/radio_source.c
     src/source/radio_source.h
     src/engine/api.h
@@ -82,17 +82,17 @@ set_target_properties(laiue_radio PROPERTIES
 
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(khinsider_tests
-        tests/khinsider_tests.c
+    add_executable(source_tests
+        tests/source_tests.c
         src/track.c
         src/track.h
-        src/source/khinsider.c
-        src/source/khinsider.h
+        src/source/ocremix.c
+        src/source/ocremix.h
     )
-    target_include_directories(khinsider_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
-    target_compile_definitions(khinsider_tests PRIVATE
+    target_include_directories(source_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+    target_compile_definitions(source_tests PRIVATE
         NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
-    target_compile_options(khinsider_tests PRIVATE /W4 /utf-8)
-    target_link_libraries(khinsider_tests PRIVATE shlwapi winhttp)
-    add_test(NAME khinsider_parser COMMAND khinsider_tests)
+    target_compile_options(source_tests PRIVATE /W4 /utf-8)
+    target_link_libraries(source_tests PRIVATE shlwapi winhttp)
+    add_test(NAME online_source_parsers COMMAND source_tests)
 endif()

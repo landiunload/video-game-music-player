@@ -1,6 +1,6 @@
 #define COBJMACROS
 #include "source/radio_source.h"
-#include "source/khinsider.h"
+#include "source/ocremix.h"
 
 #include <windows.h>
 #include <winhttp.h>
@@ -13,6 +13,7 @@
 #define SOURCE_HTML_LIMIT (4u * 1024u * 1024u)
 #define SOURCE_AUDIO_LIMIT (256ull * 1024ull * 1024ull)
 #define SOURCE_ARTWORK_LIMIT (16ull * 1024ull * 1024ull)
+#define OCREMIX_MAX_ID 5046u
 
 typedef struct HttpRequest
 {
@@ -34,6 +35,7 @@ struct RadioSource
     RadioSourceEvent events[SOURCE_EVENT_CAPACITY];
     uint32_t eventRead;
     uint32_t eventCount;
+    uint64_t randomState;
     wchar_t cacheDirectory[TRACK_PATH_CAPACITY];
 };
 
@@ -320,6 +322,16 @@ static const wchar_t* AudioExtension(const wchar_t* url)
     return L".audio";
 }
 
+static uint32_t NextRandom(RadioSource* source)
+{
+    uint64_t value = source->randomState;
+    value ^= value >> 12;
+    value ^= value << 25;
+    value ^= value >> 27;
+    source->randomState = value;
+    return (uint32_t)((value * UINT64_C(2685821657736338717)) >> 32);
+}
+
 static bool IsExpectedTrackPage(const wchar_t* url)
 {
     URL_COMPONENTS parts = { .dwStructSize = sizeof(parts) };
@@ -333,8 +345,8 @@ static bool IsExpectedTrackPage(const wchar_t* url)
         || parts.nScheme != INTERNET_SCHEME_HTTPS) return false;
     host[parts.dwHostNameLength] = L'\0';
     path[parts.dwUrlPathLength] = L'\0';
-    return _wcsicmp(host, L"downloads.khinsider.com") == 0
-        && StrStrIW(path, L"/game-soundtracks/album/") != NULL;
+    return _wcsicmp(host, L"ocremix.org") == 0
+        && StrStrIW(path, L"/remix/OCR") != NULL;
 }
 
 static void DoRandomRequest(RadioSource* source)
@@ -345,22 +357,29 @@ static void DoRandomRequest(RadioSource* source)
     size_t htmlSize = 0;
     InterlockedExchange(&source->phase, RADIO_SOURCE_FINDING);
     InterlockedExchange(&source->progressPermille, 0);
-    bool received = false;
-    for (int attempt = 0; attempt < 3 && !received; ++attempt)
+    bool parsed = false;
+    for (int attempt = 0; attempt < 8 && !parsed; ++attempt)
     {
+        if (html != NULL)
+        {
+            HeapFree(GetProcessHeap(), 0, html);
+            html = NULL;
+        }
+        uint32_t remixId = NextRandom(source) % OCREMIX_MAX_ID + 1u;
+        wchar_t requestUrl[128];
+        _snwprintf_s(requestUrl, 128, _TRUNCATE,
+            L"https://ocremix.org/remix/OCR%05u/", remixId);
         event.message[0] = L'\0';
-        received = ReadHttpMemory(source,
-            L"https://downloads.khinsider.com/random-song",
+        bool received = ReadHttpMemory(source, requestUrl,
             SOURCE_HTML_LIMIT, &html, &htmlSize,
             finalUrl, TRACK_URL_CAPACITY,
             event.message, sizeof(event.message) / sizeof(event.message[0]));
+        parsed = received && IsExpectedTrackPage(finalUrl)
+            && OcremixParseTrackPage((const char*)html, htmlSize, finalUrl,
+                &event.track, event.message,
+                sizeof(event.message) / sizeof(event.message[0]));
     }
-    if (!received)
-        goto done;
-    if (!IsExpectedTrackPage(finalUrl)
-        || !KhinsiderParseTrackPage((const char*)html, htmlSize, finalUrl,
-            &event.track, event.message,
-            sizeof(event.message) / sizeof(event.message[0])))
+    if (!parsed)
         goto done;
 
     _snwprintf_s(event.track.audioPath, TRACK_PATH_CAPACITY, _TRUNCATE,
@@ -437,6 +456,11 @@ RadioSource* RadioSourceCreate(void)
         L"%s\\laiue-radio", root);
     CreateDirectoryW(parent, NULL);
     CreateDirectoryW(source->cacheDirectory, NULL);
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    source->randomState = (uint64_t)counter.QuadPart
+        ^ GetTickCount64() ^ (uint64_t)(uintptr_t)source;
+    if (source->randomState == 0) source->randomState = UINT64_C(1);
     if (source->wakeEvent == NULL || source->session == NULL)
         goto failed;
     WinHttpSetTimeouts(source->session, 5000, 10000, 15000, 15000);
@@ -457,9 +481,12 @@ void RadioSourceDestroy(RadioSource* source)
     if (source == NULL) return;
     InterlockedExchange(&source->stop, 1);
     SetEvent(source->wakeEvent);
+    // Закрытие родительского WinHTTP handle прерывает синхронный I/O,
+    // поэтому выход не ждёт сетевого таймаута.
+    WinHttpCloseHandle(source->session);
+    source->session = NULL;
     WaitForSingleObject(source->thread, INFINITE);
     CloseHandle(source->thread);
-    WinHttpCloseHandle(source->session);
     CloseHandle(source->wakeEvent);
     DeleteCriticalSection(&source->lock);
     HeapFree(GetProcessHeap(), 0, source);

@@ -10,7 +10,7 @@ Win32 window/input/time
         │
         ├── Media Foundation audio player
         │
-        └── radio source worker ── WinHTTP ── Khinsider parser
+        └── radio source worker ── WinHTTP ── OC ReMix parser
                                       │
                                       └── local cache ── audio player
 ```
@@ -28,4 +28,3 @@ upload ring и vertex pulling для списка UI-квадов. Отдель�
 Состояние хранится отдельно от кэша в
 `%LOCALAPPDATA%\laiue-radio\state.bin`. Перед заменой файл полностью
 записывается во временный `state.bin.part`.
-
