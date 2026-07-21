@@ -125,9 +125,12 @@ LAIUE_AUDIO_API AudioResult AudioPlayerSetLooping(
     AudioPlayer* player, bool looping);
 
 // Snapshot безопасно читать из главного потока, пока callbacks Media
-// Foundation обновляют состояние на своём рабочем потоке.
+// Foundation обновляют состояние на своём рабочем потоке. Проигрыватель не
+// const: внутри кэшируются длительность и признак перемотки, опрос которых
+// у Media Foundation дороже остальной части кадра. Вызывать только с того
+// же потока, на котором проигрыватель создан.
 LAIUE_AUDIO_API bool AudioPlayerGetSnapshot(
-    const AudioPlayer* player, AudioPlayerSnapshot* outSnapshot);
+    AudioPlayer* player, AudioPlayerSnapshot* outSnapshot);
 
 // Неблокирующая очередь. События доставляются в порядке поступления;
 // при переполнении сохраняются 32 самых новых события.

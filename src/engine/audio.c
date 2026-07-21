@@ -35,7 +35,27 @@ struct AudioPlayer
     AudioEvent events[AUDIO_EVENT_CAPACITY];
     uint32_t eventHead;
     uint32_t eventCount;
+
+    // Растёт при каждом событии движка (под stateLock). Снимок сравнивает
+    // счётчик со своей копией и понимает, что кэш пора обновить.
+    uint32_t stateEpoch;
+
+    // Кэш «медленных» полей снимка; пишется только клиентским потоком
+    // в AudioPlayerGetSnapshot, поэтому блокировки не требует.
+    uint32_t cachedEpoch;
+    ULONGLONG cachedStampMs;
+    double cachedDurationSeconds;
+    bool cachedSeekable;
+    bool cacheValid;
 };
+
+// Длительность и признак перемотки меняются только при смене источника, но
+// опрашивать их у Media Foundation дорого: замер RelWithDebInfo при 60 к/с
+// дал GetSeekable ~26 мкс и GetDuration ~8 мкс за вызов — вместе больше,
+// чем сборка всего кадра интерфейса (~13 мкс). Кэш сбрасывается сразу по
+// событию движка, а интервал нужен лишь как страховка, если движок изменит
+// значения молча.
+#define AUDIO_SLOW_FIELD_INTERVAL_MS 250ULL
 
 struct AudioMediaCallback
 {
@@ -63,6 +83,7 @@ static void AudioPushEventLocked(AudioPlayer* player, AudioEventType type,
     player->events[index].streamError = streamError;
     player->events[index].platformCode = (int32_t)platformCode;
     player->eventCount++;
+    player->stateEpoch++;
 }
 
 static void AudioSetState(AudioPlayer* player, AudioPlaybackState state,
@@ -790,7 +811,29 @@ static double AudioFiniteNonnegative(double value)
         ? value : 0.0;
 }
 
-bool AudioPlayerGetSnapshot(const AudioPlayer* player,
+// Опрашивает длительность и возможность перемотки и кладёт их в кэш
+// проигрывателя. Вызывается только клиентским потоком.
+static void AudioRefreshSlowFields(AudioPlayer* player, uint32_t epoch,
+    ULONGLONG nowMs)
+{
+    player->cachedDurationSeconds = AudioFiniteNonnegative(
+        IMFMediaEngine_GetDuration(player->engine));
+    player->cachedSeekable = false;
+
+    IMFMediaTimeRange* seekable = NULL;
+    if (SUCCEEDED(IMFMediaEngine_GetSeekable(player->engine, &seekable))
+        && seekable != NULL)
+    {
+        player->cachedSeekable = IMFMediaTimeRange_GetLength(seekable) != 0;
+        IMFMediaTimeRange_Release(seekable);
+    }
+
+    player->cachedEpoch = epoch;
+    player->cachedStampMs = nowMs;
+    player->cacheValid = true;
+}
+
+bool AudioPlayerGetSnapshot(AudioPlayer* player,
     AudioPlayerSnapshot* outSnapshot)
 {
     if (player == NULL || player->engine == NULL || outSnapshot == NULL)
@@ -798,14 +841,15 @@ bool AudioPlayerGetSnapshot(const AudioPlayer* player,
         return false;
     }
 
-    AcquireSRWLockShared((PSRWLOCK)&player->stateLock);
+    AcquireSRWLockShared(&player->stateLock);
     outSnapshot->state = player->state;
     outSnapshot->streamError = player->streamError;
     outSnapshot->platformCode = (int32_t)player->platformCode;
     outSnapshot->volume = player->volume;
     outSnapshot->muted = player->muted;
     outSnapshot->looping = player->looping;
-    ReleaseSRWLockShared((PSRWLOCK)&player->stateLock);
+    uint32_t epoch = player->stateEpoch;
+    ReleaseSRWLockShared(&player->stateLock);
 
     if (outSnapshot->state == AUDIO_PLAYBACK_EMPTY)
     {
@@ -814,24 +858,23 @@ bool AudioPlayerGetSnapshot(const AudioPlayer* player,
         outSnapshot->seeking = false;
         outSnapshot->seekable = false;
         outSnapshot->hasAudio = false;
+        player->cacheValid = false;
         return true;
     }
 
     outSnapshot->positionSeconds = AudioFiniteNonnegative(
         IMFMediaEngine_GetCurrentTime(player->engine));
-    outSnapshot->durationSeconds = AudioFiniteNonnegative(
-        IMFMediaEngine_GetDuration(player->engine));
     outSnapshot->seeking = IMFMediaEngine_IsSeeking(player->engine) != FALSE;
     outSnapshot->hasAudio = IMFMediaEngine_HasAudio(player->engine) != FALSE;
-    outSnapshot->seekable = false;
 
-    IMFMediaTimeRange* seekable = NULL;
-    if (SUCCEEDED(IMFMediaEngine_GetSeekable(player->engine, &seekable))
-        && seekable != NULL)
+    ULONGLONG nowMs = GetTickCount64();
+    if (!player->cacheValid || player->cachedEpoch != epoch
+        || nowMs - player->cachedStampMs >= AUDIO_SLOW_FIELD_INTERVAL_MS)
     {
-        outSnapshot->seekable = IMFMediaTimeRange_GetLength(seekable) != 0;
-        IMFMediaTimeRange_Release(seekable);
+        AudioRefreshSlowFields(player, epoch, nowMs);
     }
+    outSnapshot->durationSeconds = player->cachedDurationSeconds;
+    outSnapshot->seekable = player->cachedSeekable;
     return true;
 }
 
