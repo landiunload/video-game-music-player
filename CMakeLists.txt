@@ -107,4 +107,17 @@ if(BUILD_TESTING)
     target_compile_options(ui_font_tests PRIVATE /W4 /utf-8)
     target_link_libraries(ui_font_tests PRIVATE gdi32 user32)
     add_test(NAME ui_font_glyph_lookup COMMAND ui_font_tests)
+
+    add_executable(player_state_tests
+        tests/player_state_tests.c
+        src/player_state.c
+        src/player_state.h
+        src/track.c
+        src/track.h
+    )
+    target_include_directories(player_state_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+    target_compile_definitions(player_state_tests PRIVATE
+        NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+    target_compile_options(player_state_tests PRIVATE /W4 /utf-8)
+    add_test(NAME player_state_history COMMAND player_state_tests)
 endif()
