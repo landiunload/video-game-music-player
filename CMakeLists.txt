@@ -120,4 +120,15 @@ if(BUILD_TESTING)
         NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
     target_compile_options(player_state_tests PRIVATE /W4 /utf-8)
     add_test(NAME player_state_history COMMAND player_state_tests)
+
+    add_executable(track_tests
+        tests/track_tests.c
+        src/track.c
+        src/track.h
+    )
+    target_include_directories(track_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+    target_compile_definitions(track_tests PRIVATE
+        NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+    target_compile_options(track_tests PRIVATE /W4 /utf-8)
+    add_test(NAME track_local_file COMMAND track_tests)
 endif()
